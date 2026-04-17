@@ -6,18 +6,21 @@
 mkdir build
 cd build
 cmake -DBUILD_SHARED_LIBS=OFF -DENABLE_CJSON_TEST=OFF ..
-make -j$(nproc)
+make -j"$(nproc)"
 
 $CXX $CXXFLAGS $SRC/cjson/fuzzing/cjson_read_fuzzer.c -I. \
     -o $OUT/cjson_read_fuzzer \
     $LIB_FUZZING_ENGINE $SRC/cjson/build/libcjson.a
 
-#new harness
-$CXX $CXXFLAGS $SRC/cjson/fuzzing/cjson_add_number_to_object_fuzzer.c -I. \
-  -o $OUT/cjson_add_number_to_object_fuzzer \
-  $LIB_FUZZING_ENGINE $SRC/cjson/build/libcjson.a
+$CXX $CXXFLAGS $SRC/cjson/fuzzing/cjson_create_fuzzer.c -I. \
+    -o $OUT/cjson_create_fuzzer \
+    $LIB_FUZZING_ENGINE $SRC/cjson/build/libcjson.a
 
 find $SRC/cjson/fuzzing/inputs -name "*" | \
-     xargs zip $OUT/cjson_read_fuzzer_seed_corpus.zip
+    xargs zip $OUT/cjson_read_fuzzer_seed_corpus.zip
+
+find $SRC/cjson/fuzzing/inputs -name "*" | \
+    xargs zip $OUT/cjson_create_fuzzer_seed_corpus.zip
 
 cp $SRC/cjson/fuzzing/json.dict $OUT/cjson_read_fuzzer.dict
+cp $SRC/cjson/fuzzing/json.dict $OUT/cjson_create_fuzzer.dict

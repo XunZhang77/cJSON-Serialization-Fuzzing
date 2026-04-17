@@ -25,6 +25,7 @@ RUN git clone --depth 1 https://github.com/DaveGamble/cJSON.git cjson
 #overwrites the fresh cloned repo
 COPY build.sh $SRC/
 COPY cjson_add_number_to_object_fuzzer.c $SRC/cjson/fuzzing/
+COPY cjson_create_fuzzer.c $SRC/cjson/fuzzing/
 COPY ossfuzz.sh $SRC/cjson/fuzzing/
 
 WORKDIR cjson
