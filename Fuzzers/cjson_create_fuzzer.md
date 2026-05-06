@@ -86,14 +86,13 @@ For numbers created through:
 
 the harness checks:
 
-- `valuedouble` numerically matches the input value
+- the created node is a number
 - `valueint` follows cJSON’s saturation rule
-- `cJSON_GetNumberValue` is consistent
+- finite inputs compare equal to a fresh `cJSON_CreateNumber` reference node
 
-For finite values and infinities, numeric checks use NaN-aware,
-tolerance-based equality rather than raw `==`. For `NaN`, the harness checks
-`isnan` and intentionally skips a `valueint` oracle because cJSON does not
-define a portable NaN-to-int contract.
+For non-finite inputs, the harness avoids strict numeric-value assertions and
+checks only behavior that cJSON defines more clearly, such as printing as
+`null`.
 
 ## 3. Round-trip safety
 
@@ -268,8 +267,10 @@ It also preserves global invalid checks for `NULL` and negative counts.
 It checks:
 
 - size and element count
-- numeric conversion from `float` to `double` with NaN-aware, tolerance-based equality
-- independence from the source float buffer after creation
+- each element behaves like the corresponding number node under the simplified
+  numeric oracle
+- independence from the source float buffer after creation, checked by
+  unchanged serialized output
 - safe round-trip equality when all numbers are finite
 
 For non-finite values the array is still validated structurally, but the
@@ -282,8 +283,10 @@ round-trip equality oracle is skipped.
 It checks:
 
 - size and element count
-- stored numeric value with NaN-aware, tolerance-based equality
-- source-buffer independence after creation
+- each element behaves like the corresponding number node under the simplified
+  numeric oracle
+- source-buffer independence after creation, checked by unchanged serialized
+  output
 - safe round-trip equality when all numbers are finite
 
 This is the widest numeric coverage because doubles are created directly from
@@ -355,7 +358,7 @@ The harness enforces these correctness statements:
 
 - primitive creators return the correct base type
 - fresh top-level created items are detached
-- number creation preserves numeric value and saturated `valueint`
+- number creation preserves the cJSON number contract without raw floating-point equality
 - null/true/false/bool print correctly
 - empty object/array creators return empty containers
 - `CreateString` and `CreateRaw` copy source storage

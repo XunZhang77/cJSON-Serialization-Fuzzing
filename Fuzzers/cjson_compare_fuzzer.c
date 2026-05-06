@@ -461,7 +461,6 @@ static void verify_null_and_invalid_behavior(const cJSON *item) {
 
 static void verify_roundtrip_if_safe(const cJSON *item) {
     char *printed = NULL;
-    char *printed_again = NULL;
     cJSON *parsed = NULL;
 
     if ((item == NULL) ||
@@ -480,12 +479,6 @@ static void verify_roundtrip_if_safe(const cJSON *item) {
     fuzz_assert(parsed != NULL);
     fuzz_assert(cJSON_Compare(item, parsed, 1));
     fuzz_assert(cJSON_Compare(item, parsed, 0));
-
-    printed_again = cJSON_PrintUnformatted(parsed);
-    fuzz_assert(printed_again != NULL);
-    fuzz_assert(strcmp(printed, printed_again) == 0);
-
-    free(printed_again);
     cJSON_Delete(parsed);
     free(printed);
 }

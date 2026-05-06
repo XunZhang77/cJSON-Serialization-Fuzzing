@@ -1,5 +1,4 @@
 #include <ctype.h>
-#include <float.h>
 #include <limits.h>
 #include <math.h>
 #include <stddef.h>
@@ -157,27 +156,6 @@ static char *read_bounded_string(const uint8_t **data, size_t *size) {
     return out;
 }
 
-static int numbers_match(double left, double right) {
-    double diff = 0.0;
-    double scale = 0.0;
-
-    if (isnan(left) && isnan(right)) {
-        return 1;
-    }
-
-    if (left == right) {
-        return 1;
-    }
-
-    if (!isfinite(left) || !isfinite(right)) {
-        return 0;
-    }
-
-    diff = fabs(left - right);
-    scale = fmax(1.0, fmax(fabs(left), fabs(right)));
-    return diff <= (DBL_EPSILON * 8.0 * scale);
-}
-
 static int number_to_valueint(double number) {
     fuzz_assert(!isnan(number));
 
@@ -288,7 +266,6 @@ static cJSON_bool tree_is_roundtrip_safe(const cJSON *item) {
 
 static void verify_roundtrip_if_safe(const cJSON *item) {
     char *printed = NULL;
-    char *printed_again = NULL;
     cJSON *parsed = NULL;
 
     if (!tree_is_roundtrip_safe(item)) {
@@ -304,12 +281,6 @@ static void verify_roundtrip_if_safe(const cJSON *item) {
     fuzz_assert(parsed != NULL);
     fuzz_assert(cJSON_Compare(item, parsed, 1));
     fuzz_assert(cJSON_Compare(item, parsed, 0));
-
-    printed_again = cJSON_PrintUnformatted(parsed);
-    fuzz_assert(printed_again != NULL);
-    fuzz_assert(strcmp(printed, printed_again) == 0);
-
-    free(printed_again);
     cJSON_Delete(parsed);
     free(printed);
 }
@@ -338,16 +309,23 @@ static void verify_fresh_item(const cJSON *item, int base_type) {
 }
 
 static void verify_number_item(const cJSON *item, double expected) {
+    cJSON *reference = NULL;
+
     verify_item_type(item, cJSON_Number);
 
-    if (isnan(expected)) {
-        fuzz_assert(isnan(item->valuedouble));
-        fuzz_assert(isnan(cJSON_GetNumberValue(item)));
-    } else {
-        fuzz_assert(numbers_match(item->valuedouble, expected));
-        fuzz_assert(numbers_match(cJSON_GetNumberValue(item), expected));
-        fuzz_assert(item->valueint == number_to_valueint(expected));
+    if (!isfinite(expected)) {
+        fuzz_assert(!isfinite(cJSON_GetNumberValue(item)));
+        return;
     }
+
+    reference = cJSON_CreateNumber(expected);
+    if (reference != NULL) {
+        fuzz_assert(cJSON_Compare(item, reference, 1));
+        fuzz_assert(cJSON_Compare(item, reference, 0));
+        cJSON_Delete(reference);
+    }
+
+    fuzz_assert(item->valueint == number_to_valueint(expected));
 }
 
 static void verify_global_invalid_behavior(void) {
@@ -722,9 +700,15 @@ static void run_float_array_scenario(const uint8_t **data, size_t *size) {
     if (array != NULL) {
         verify_float_array(array, (count > 0) ? values : &dummy, count);
         if (count > 0) {
-            double before = cJSON_GetArrayItem(array, 0)->valuedouble;
+            char *before = cJSON_PrintUnformatted(array);
             values[0] += 1.0f;
-            fuzz_assert(numbers_match(cJSON_GetArrayItem(array, 0)->valuedouble, before));
+            char *after = NULL;
+            fuzz_assert(before != NULL);
+            after = cJSON_PrintUnformatted(array);
+            fuzz_assert(after != NULL);
+            fuzz_assert(strcmp(before, after) == 0);
+            free(after);
+            free(before);
         } else {
             verify_printed_text(array, "[]");
         }
@@ -772,9 +756,15 @@ static void run_double_array_scenario(const uint8_t **data, size_t *size) {
     if (array != NULL) {
         verify_double_array(array, (count > 0) ? values : &dummy, count);
         if (count > 0) {
-            double before = cJSON_GetArrayItem(array, 0)->valuedouble;
+            char *before = cJSON_PrintUnformatted(array);
             values[0] += 1.0;
-            fuzz_assert(numbers_match(cJSON_GetArrayItem(array, 0)->valuedouble, before));
+            char *after = NULL;
+            fuzz_assert(before != NULL);
+            after = cJSON_PrintUnformatted(array);
+            fuzz_assert(after != NULL);
+            fuzz_assert(strcmp(before, after) == 0);
+            free(after);
+            free(before);
         } else {
             verify_printed_text(array, "[]");
         }

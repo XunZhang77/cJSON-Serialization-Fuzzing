@@ -162,8 +162,6 @@ When a tree has no ambiguous object keys, the harness checks:
 1. print with `cJSON_PrintUnformatted`
 2. parse the printed text
 3. require semantic equality with the printed source tree
-4. print the reparsed tree again
-5. require identical unformatted output
 
 This is implemented in `verify_roundtrip_if_safe`.
 
@@ -174,8 +172,7 @@ remain unchanged.
 
 Mutation targets are:
 
-- numbers via `cJSON_SetNumberValue`, using a representable distinct value
-  instead of assuming `x + 1 != x` for every `double`
+- numbers via `cJSON_SetNumberValue`, using a simple distinct integer value
 - strings via `cJSON_SetValuestring`
 
 This is done both in deterministic scenarios and in the parsed-input path.

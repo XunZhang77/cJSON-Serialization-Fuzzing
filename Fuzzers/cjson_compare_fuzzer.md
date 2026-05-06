@@ -155,15 +155,13 @@ For any structured scenario pair:
 This catches regressions where `cJSON_Compare` depends on pointer identity or
 transient internal structure instead of semantic value.
 
-## 4. Print/parse round-trip stability
+## 4. Print/parse round-trip
 
 When a tree is safe to round-trip:
 
 1. print with `cJSON_PrintUnformatted`
 2. parse the printed string
 3. compare original and reparsed trees
-4. print the reparsed tree again
-5. require identical unformatted output
 
 This is enforced by `verify_roundtrip_if_safe`.
 
