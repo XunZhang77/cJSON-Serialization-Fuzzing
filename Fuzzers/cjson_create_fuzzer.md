@@ -86,11 +86,14 @@ For numbers created through:
 
 the harness checks:
 
-- `valuedouble` matches the input value
+- `valuedouble` numerically matches the input value
 - `valueint` follows cJSON’s saturation rule
 - `cJSON_GetNumberValue` is consistent
 
-For `NaN`, the harness checks `isnan` rather than direct equality.
+For finite values and infinities, numeric checks use NaN-aware,
+tolerance-based equality rather than raw `==`. For `NaN`, the harness checks
+`isnan` and intentionally skips a `valueint` oracle because cJSON does not
+define a portable NaN-to-int contract.
 
 ## 3. Round-trip safety
 
@@ -265,7 +268,7 @@ It also preserves global invalid checks for `NULL` and negative counts.
 It checks:
 
 - size and element count
-- numeric conversion from `float` to `double`
+- numeric conversion from `float` to `double` with NaN-aware, tolerance-based equality
 - independence from the source float buffer after creation
 - safe round-trip equality when all numbers are finite
 
@@ -279,7 +282,7 @@ round-trip equality oracle is skipped.
 It checks:
 
 - size and element count
-- exact stored numeric value (with `NaN` handled specially)
+- stored numeric value with NaN-aware, tolerance-based equality
 - source-buffer independence after creation
 - safe round-trip equality when all numbers are finite
 
@@ -352,7 +355,7 @@ The harness enforces these correctness statements:
 
 - primitive creators return the correct base type
 - fresh top-level created items are detached
-- number creation preserves `valuedouble` and saturated `valueint`
+- number creation preserves numeric value and saturated `valueint`
 - null/true/false/bool print correctly
 - empty object/array creators return empty containers
 - `CreateString` and `CreateRaw` copy source storage

@@ -174,7 +174,8 @@ remain unchanged.
 
 Mutation targets are:
 
-- numbers via `cJSON_SetNumberValue`
+- numbers via `cJSON_SetNumberValue`, using a representable distinct value
+  instead of assuming `x + 1 != x` for every `double`
 - strings via `cJSON_SetValuestring`
 
 This is done both in deterministic scenarios and in the parsed-input path.

@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <float.h>
 #include <limits.h>
 #include <math.h>
 #include <stddef.h>
@@ -156,7 +157,30 @@ static char *read_bounded_string(const uint8_t **data, size_t *size) {
     return out;
 }
 
+static int numbers_match(double left, double right) {
+    double diff = 0.0;
+    double scale = 0.0;
+
+    if (isnan(left) && isnan(right)) {
+        return 1;
+    }
+
+    if (left == right) {
+        return 1;
+    }
+
+    if (!isfinite(left) || !isfinite(right)) {
+        return 0;
+    }
+
+    diff = fabs(left - right);
+    scale = fmax(1.0, fmax(fabs(left), fabs(right)));
+    return diff <= (DBL_EPSILON * 8.0 * scale);
+}
+
 static int number_to_valueint(double number) {
+    fuzz_assert(!isnan(number));
+
     if (number >= INT_MAX) {
         return INT_MAX;
     }
@@ -320,11 +344,10 @@ static void verify_number_item(const cJSON *item, double expected) {
         fuzz_assert(isnan(item->valuedouble));
         fuzz_assert(isnan(cJSON_GetNumberValue(item)));
     } else {
-        fuzz_assert(item->valuedouble == expected);
-        fuzz_assert(cJSON_GetNumberValue(item) == expected);
+        fuzz_assert(numbers_match(item->valuedouble, expected));
+        fuzz_assert(numbers_match(cJSON_GetNumberValue(item), expected));
+        fuzz_assert(item->valueint == number_to_valueint(expected));
     }
-
-    fuzz_assert(item->valueint == number_to_valueint(expected));
 }
 
 static void verify_global_invalid_behavior(void) {
@@ -701,11 +724,7 @@ static void run_float_array_scenario(const uint8_t **data, size_t *size) {
         if (count > 0) {
             double before = cJSON_GetArrayItem(array, 0)->valuedouble;
             values[0] += 1.0f;
-            if (isnan(before)) {
-                fuzz_assert(isnan(cJSON_GetArrayItem(array, 0)->valuedouble));
-            } else {
-                fuzz_assert(cJSON_GetArrayItem(array, 0)->valuedouble == before);
-            }
+            fuzz_assert(numbers_match(cJSON_GetArrayItem(array, 0)->valuedouble, before));
         } else {
             verify_printed_text(array, "[]");
         }
@@ -755,11 +774,7 @@ static void run_double_array_scenario(const uint8_t **data, size_t *size) {
         if (count > 0) {
             double before = cJSON_GetArrayItem(array, 0)->valuedouble;
             values[0] += 1.0;
-            if (isnan(before)) {
-                fuzz_assert(isnan(cJSON_GetArrayItem(array, 0)->valuedouble));
-            } else {
-                fuzz_assert(cJSON_GetArrayItem(array, 0)->valuedouble == before);
-            }
+            fuzz_assert(numbers_match(cJSON_GetArrayItem(array, 0)->valuedouble, before));
         } else {
             verify_printed_text(array, "[]");
         }

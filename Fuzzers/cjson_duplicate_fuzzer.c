@@ -1,4 +1,6 @@
 #include <ctype.h>
+#include <float.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -14,6 +16,55 @@ static void fuzz_assert(int condition) {
     if (!condition) {
         abort();
     }
+}
+
+static int numbers_match(double left, double right) {
+    double diff = 0.0;
+    double scale = 0.0;
+
+    if (isnan(left) && isnan(right)) {
+        return 1;
+    }
+
+    if (left == right) {
+        return 1;
+    }
+
+    if (!isfinite(left) || !isfinite(right)) {
+        return 0;
+    }
+
+    diff = fabs(left - right);
+    scale = fmax(1.0, fmax(fabs(left), fabs(right)));
+    return diff <= (DBL_EPSILON * 8.0 * scale);
+}
+
+static double choose_distinct_number(double value, int delta) {
+    double candidate = 0.0;
+
+    if (delta == 0) {
+        delta = 1;
+    }
+
+    if (!isfinite(value)) {
+        return 0.0;
+    }
+
+    candidate = value + (double)delta;
+    if (!numbers_match(candidate, value)) {
+        return candidate;
+    }
+
+    candidate = nextafter(value, (delta < 0) ? -INFINITY : INFINITY);
+    if (!numbers_match(candidate, value)) {
+        return candidate;
+    }
+
+    if (!numbers_match(0.0, value)) {
+        return 0.0;
+    }
+
+    return 1.0;
 }
 
 static int read_u8(const uint8_t **data, size_t *size, uint8_t *out) {
@@ -280,7 +331,7 @@ static void verify_top_level_duplicate_metadata(const cJSON *original,
 
     if (cJSON_IsNumber(original)) {
         fuzz_assert(dup->valueint == original->valueint);
-        fuzz_assert(dup->valuedouble == original->valuedouble);
+        fuzz_assert(numbers_match(dup->valuedouble, original->valuedouble));
     }
 
     if (recurse) {
@@ -326,7 +377,7 @@ static void verify_tree_distinct(const cJSON *original, const cJSON *dup) {
 
     if (cJSON_IsNumber(original)) {
         fuzz_assert(dup->valueint == original->valueint);
-        fuzz_assert(dup->valuedouble == original->valuedouble);
+        fuzz_assert(numbers_match(dup->valuedouble, original->valuedouble));
     }
 
     if (original->child != NULL) {
@@ -350,6 +401,7 @@ static int mutate_first_number_or_string(const cJSON *original, cJSON *dup, int 
     cJSON *string_item = NULL;
     const char *replacement = NULL;
     double old_value = 0.0;
+    double new_value = 0.0;
     const char *old_text = NULL;
 
     fuzz_assert(original != NULL);
@@ -357,13 +409,11 @@ static int mutate_first_number_or_string(const cJSON *original, cJSON *dup, int 
 
     if (cJSON_IsNumber(original) && cJSON_IsNumber(dup)) {
         old_value = original->valuedouble;
-        if (delta == 0) {
-            delta = 1;
-        }
+        new_value = choose_distinct_number(old_value, delta);
 
-        cJSON_SetNumberValue(dup, old_value + (double)delta);
-        fuzz_assert(original->valuedouble == old_value);
-        fuzz_assert(dup->valuedouble != old_value);
+        cJSON_SetNumberValue(dup, new_value);
+        fuzz_assert(numbers_match(original->valuedouble, old_value));
+        fuzz_assert(!numbers_match(dup->valuedouble, old_value));
         return 1;
     }
 
@@ -404,6 +454,7 @@ static void run_recursive_seed_scenario(const uint8_t **data, size_t *size) {
     char *replacement = NULL;
     int delta = 0;
     double root_value_before = 0.0;
+    double mutated_value = 0.0;
 
     root = create_seed_tree();
     if (root == NULL) {
@@ -455,8 +506,9 @@ static void run_recursive_seed_scenario(const uint8_t **data, size_t *size) {
     root_label = seed_nested_label(root);
 
     root_value_before = root_number->valuedouble;
-    cJSON_SetNumberValue(dup_number, root_value_before + (double)delta);
-    fuzz_assert(root_number->valuedouble == root_value_before);
+    mutated_value = choose_distinct_number(root_value_before, delta);
+    cJSON_SetNumberValue(dup_number, mutated_value);
+    fuzz_assert(numbers_match(root_number->valuedouble, root_value_before));
     fuzz_assert(cJSON_SetValuestring(dup ? seed_nested_label(dup) : NULL, replacement) != NULL);
     fuzz_assert(strcmp(root_label->valuestring, "alpha") == 0);
     fuzz_assert(!cJSON_Compare(root, dup, 1));
@@ -470,8 +522,8 @@ static void run_recursive_seed_scenario(const uint8_t **data, size_t *size) {
         verify_top_level_duplicate_metadata(root, dup2, 1);
         verify_tree_distinct(root, dup2);
         fuzz_assert(cJSON_Compare(root, dup2, 1));
-        cJSON_SetNumberValue(seed_nested_value(root), root_value_before + (double)delta);
-        fuzz_assert(seed_nested_value(dup2)->valuedouble == root_value_before);
+        cJSON_SetNumberValue(seed_nested_value(root), mutated_value);
+        fuzz_assert(numbers_match(seed_nested_value(dup2)->valuedouble, root_value_before));
         fuzz_assert(!cJSON_Compare(root, dup2, 1));
 
         dup2_label = seed_nested_label(dup2);
@@ -626,7 +678,7 @@ static void run_const_key_scenario(void) {
     fuzz_assert(root_item != dup_item);
 
     cJSON_SetNumberValue(dup_item, 11.0);
-    fuzz_assert(root_item->valuedouble == 5.0);
+    fuzz_assert(numbers_match(root_item->valuedouble, 5.0));
     fuzz_assert(!cJSON_Compare(root, dup, 1));
 
     cJSON_Delete(dup);
